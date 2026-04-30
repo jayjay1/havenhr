@@ -1,0 +1,26 @@
+# Dependencies
+backend/vendor/
+frontend/node_modules/
+frontend/.next/
+
+# Environment files
+backend/.env
+frontend/.env.local
+
+# Database
+backend/database/database.sqlite
+
+# Storage
+backend/storage/framework/cache/data/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/storage/logs/*.log
+backend/storage/app/resumes/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
