@@ -7,6 +7,9 @@ use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\CandidateAuthController;
 use App\Http\Controllers\CandidateProfileController;
 use App\Http\Controllers\EmployerApplicationController;
+use App\Http\Controllers\JobPostingController;
+use App\Http\Controllers\PipelineController;
+use App\Http\Controllers\PublicJobController;
 use App\Http\Controllers\PublicResumeController;
 use App\Http\Controllers\ResumeController;
 use App\Http\Controllers\RoleController;
@@ -49,6 +52,31 @@ Route::prefix('v1')->group(function () {
         // Role assignment
         Route::post('/users/{id}/roles', [RoleController::class, 'assignRole'])->middleware('rbac:manage_roles');
         Route::put('/users/{id}/roles', [RoleController::class, 'updateRole'])->middleware('rbac:manage_roles');
+
+        // Pipeline stage management (tenant-scoped) — must be before /jobs/{id} to avoid route conflicts
+        Route::get('/jobs/{jobId}/stages', [PipelineController::class, 'listStages'])->middleware('rbac:jobs.view');
+        Route::post('/jobs/{jobId}/stages', [PipelineController::class, 'addStage'])->middleware('rbac:pipeline.manage');
+        Route::put('/jobs/{jobId}/stages/reorder', [PipelineController::class, 'reorderStages'])->middleware('rbac:pipeline.manage');
+        Route::delete('/jobs/{jobId}/stages/{stageId}', [PipelineController::class, 'removeStage'])->middleware('rbac:pipeline.manage');
+
+        // Employer application endpoints (tenant-scoped) — must be before /jobs/{id}
+        Route::get('/jobs/{jobId}/applications', [EmployerApplicationController::class, 'listForJob'])->middleware('rbac:applications.view');
+
+        // Job posting management (tenant-scoped)
+        Route::get('/jobs', [JobPostingController::class, 'index'])->middleware('rbac:jobs.list');
+        Route::post('/jobs', [JobPostingController::class, 'store'])->middleware('rbac:jobs.create');
+        Route::get('/jobs/{id}', [JobPostingController::class, 'show'])->middleware('rbac:jobs.view');
+        Route::put('/jobs/{id}', [JobPostingController::class, 'update'])->middleware('rbac:jobs.update');
+        Route::delete('/jobs/{id}', [JobPostingController::class, 'destroy'])->middleware('rbac:jobs.delete');
+        Route::patch('/jobs/{id}/status', [JobPostingController::class, 'transitionStatus'])->middleware('rbac:jobs.update');
+
+        // Application stage transitions (tenant-scoped)
+        Route::post('/applications/{appId}/move', [PipelineController::class, 'moveApplication'])->middleware('rbac:applications.manage');
+        Route::get('/applications/{appId}/transitions', [PipelineController::class, 'transitionHistory'])->middleware('rbac:applications.view');
+
+        // Employer application detail and talent pool (tenant-scoped)
+        Route::get('/applications/{id}', [EmployerApplicationController::class, 'show'])->middleware('rbac:applications.view');
+        Route::get('/talent-pool', [EmployerApplicationController::class, 'talentPool'])->middleware('rbac:applications.view');
     });
 
     // Candidate auth endpoints
@@ -120,10 +148,7 @@ Route::prefix('v1')->group(function () {
     // Public resume endpoint (no auth required)
     Route::get('/public/resumes/{token}', [PublicResumeController::class, 'show']);
 
-    // Employer application and talent pool endpoints (tenant-scoped)
-    Route::middleware(['havenhr.auth', 'tenant.resolve', 'rbac:applications.view'])->group(function () {
-        Route::get('/jobs/{jobId}/applications', [EmployerApplicationController::class, 'listForJob']);
-        Route::get('/applications/{id}', [EmployerApplicationController::class, 'show']);
-        Route::get('/talent-pool', [EmployerApplicationController::class, 'talentPool']);
-    });
+    // Public job board endpoints (no auth required)
+    Route::get('/public/jobs', [PublicJobController::class, 'index']);
+    Route::get('/public/jobs/{slug}', [PublicJobController::class, 'show']);
 });

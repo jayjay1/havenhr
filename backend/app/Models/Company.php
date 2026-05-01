@@ -68,4 +68,12 @@ class Company extends Model
     {
         return $this->hasMany(AuditLog::class, 'tenant_id');
     }
+
+    /**
+     * Get the job postings that belong to this company.
+     */
+    public function jobPostings(): HasMany
+    {
+        return $this->hasMany(JobPosting::class, 'tenant_id');
+    }
 }

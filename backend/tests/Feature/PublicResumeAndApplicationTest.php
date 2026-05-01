@@ -1,8 +1,12 @@
 <?php
 
 use App\Models\Candidate;
+use App\Models\Company;
 use App\Models\JobApplication;
+use App\Models\JobPosting;
 use App\Models\Resume;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -15,6 +19,23 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 function candidateToken(Candidate $candidate): string
 {
     return JWTAuth::claims(['role' => 'candidate'])->fromUser($candidate);
+}
+
+function createPublishedJobPosting(): JobPosting
+{
+    $company = Company::factory()->create();
+    $user = User::withoutGlobalScopes()->create([
+        'name' => 'Test Employer',
+        'email' => fake()->unique()->safeEmail(),
+        'password_hash' => Hash::make('Password123!'),
+        'tenant_id' => $company->id,
+        'is_active' => true,
+    ]);
+
+    return JobPosting::factory()->published()->create([
+        'tenant_id' => $company->id,
+        'created_by' => $user->id,
+    ]);
 }
 
 /*
@@ -149,18 +170,18 @@ it('submits a job application and snapshots resume content', function () {
         'is_complete' => true,
     ]);
 
-    $jobPostingId = (string) Str::uuid();
+    $jobPosting = createPublishedJobPosting();
     $token = candidateToken($candidate);
 
     $response = $this->withHeaders([
         'Authorization' => "Bearer {$token}",
     ])->postJson('/api/v1/candidate/applications', [
-        'job_posting_id' => $jobPostingId,
+        'job_posting_id' => $jobPosting->id,
         'resume_id' => $resume->id,
     ]);
 
     $response->assertStatus(201);
-    expect($response->json('data.job_posting_id'))->toBe($jobPostingId);
+    expect($response->json('data.job_posting_id'))->toBe($jobPosting->id);
     expect($response->json('data.resume_id'))->toBe($resume->id);
     expect($response->json('data.status'))->toBe('submitted');
 
@@ -182,12 +203,12 @@ it('rejects duplicate application with 409', function () {
         'is_complete' => true,
     ]);
 
-    $jobPostingId = (string) Str::uuid();
+    $jobPosting = createPublishedJobPosting();
 
     // Create first application directly
     JobApplication::create([
         'candidate_id' => $candidate->id,
-        'job_posting_id' => $jobPostingId,
+        'job_posting_id' => $jobPosting->id,
         'resume_id' => $resume->id,
         'resume_snapshot' => $resume->content,
         'status' => 'submitted',
@@ -200,7 +221,7 @@ it('rejects duplicate application with 409', function () {
     $response = $this->withHeaders([
         'Authorization' => "Bearer {$token}",
     ])->postJson('/api/v1/candidate/applications', [
-        'job_posting_id' => $jobPostingId,
+        'job_posting_id' => $jobPosting->id,
         'resume_id' => $resume->id,
     ]);
 
@@ -208,7 +229,7 @@ it('rejects duplicate application with 409', function () {
     expect($response->json('error.code'))->toBe('DUPLICATE_APPLICATION');
 });
 
-it('returns 404 when applying with a resume that does not belong to the candidate', function () {
+it('returns 422 when applying to non-published job posting', function () {
     $candidate1 = Candidate::factory()->create();
     $candidate2 = Candidate::factory()->create();
 
@@ -229,7 +250,7 @@ it('returns 404 when applying with a resume that does not belong to the candidat
         'resume_id' => $resume->id,
     ]);
 
-    $response->assertStatus(404);
+    $response->assertStatus(422);
 });
 
 it('returns 422 when applying with missing fields', function () {
@@ -260,9 +281,12 @@ it('lists all applications for the authenticated candidate', function () {
         'is_complete' => true,
     ]);
 
+    $jobPosting1 = createPublishedJobPosting();
+    $jobPosting2 = createPublishedJobPosting();
+
     JobApplication::create([
         'candidate_id' => $candidate->id,
-        'job_posting_id' => (string) Str::uuid(),
+        'job_posting_id' => $jobPosting1->id,
         'resume_id' => $resume->id,
         'resume_snapshot' => $resume->content,
         'status' => 'submitted',
@@ -271,7 +295,7 @@ it('lists all applications for the authenticated candidate', function () {
 
     JobApplication::create([
         'candidate_id' => $candidate->id,
-        'job_posting_id' => (string) Str::uuid(),
+        'job_posting_id' => $jobPosting2->id,
         'resume_id' => $resume->id,
         'resume_snapshot' => $resume->content,
         'status' => 'submitted',
@@ -301,9 +325,11 @@ it('does not list applications from other candidates', function () {
         'is_complete' => true,
     ]);
 
+    $jobPosting = createPublishedJobPosting();
+
     JobApplication::create([
         'candidate_id' => $candidate2->id,
-        'job_posting_id' => (string) Str::uuid(),
+        'job_posting_id' => $jobPosting->id,
         'resume_id' => $resume->id,
         'resume_snapshot' => $resume->content,
         'status' => 'submitted',

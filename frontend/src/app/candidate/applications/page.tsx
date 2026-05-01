@@ -1,9 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { candidateApiClient } from "@/lib/candidateApi";
 import { ApiRequestError } from "@/lib/api";
-import type { JobApplication } from "@/types/candidate";
+
+interface CandidateApplication {
+  id: string;
+  job_posting_id: string;
+  resume_id: string;
+  status: "submitted" | "reviewed" | "shortlisted" | "rejected";
+  applied_at: string;
+  updated_at: string;
+  job_title?: string;
+  company_name?: string;
+  pipeline_stage?: string;
+  job_slug?: string;
+}
 
 const STATUS_STYLES: Record<string, string> = {
   submitted: "bg-blue-100 text-blue-700",
@@ -12,15 +25,24 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-red-100 text-red-700",
 };
 
+const STAGE_STYLES: Record<string, string> = {
+  Applied: "bg-blue-50 text-blue-600",
+  Screening: "bg-purple-50 text-purple-600",
+  Interview: "bg-indigo-50 text-indigo-600",
+  Offer: "bg-green-50 text-green-600",
+  Hired: "bg-emerald-50 text-emerald-600",
+  Rejected: "bg-red-50 text-red-600",
+};
+
 export default function ApplicationsPage() {
-  const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [applications, setApplications] = useState<CandidateApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchApplications() {
       try {
-        const response = await candidateApiClient.get<JobApplication[]>(
+        const response = await candidateApiClient.get<CandidateApplication[]>(
           "/candidate/applications"
         );
         setApplications(response.data);
@@ -90,6 +112,12 @@ export default function ApplicationsPage() {
           <p className="mt-1 text-sm text-gray-500">
             When you apply to jobs, they&apos;ll appear here.
           </p>
+          <Link
+            href="/jobs"
+            className="mt-4 inline-flex items-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          >
+            Browse Jobs
+          </Link>
         </div>
       )}
 
@@ -104,7 +132,19 @@ export default function ApplicationsPage() {
                     scope="col"
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
-                    Job Posting
+                    Job
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Company
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Stage
                   </th>
                   <th
                     scope="col"
@@ -129,10 +169,37 @@ export default function ApplicationsPage() {
               <tbody className="divide-y divide-gray-200">
                 {applications.map((app) => (
                   <tr key={app.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      <span className="font-mono text-xs text-gray-500">
-                        {app.job_posting_id.slice(0, 8)}…
-                      </span>
+                    <td className="px-4 py-3 text-sm">
+                      {app.job_title && app.job_slug ? (
+                        <Link
+                          href={`/jobs/${app.job_slug}`}
+                          className="font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          {app.job_title}
+                        </Link>
+                      ) : app.job_title ? (
+                        <span className="font-medium text-gray-900">{app.job_title}</span>
+                      ) : (
+                        <span className="font-mono text-xs text-gray-500">
+                          {app.job_posting_id.slice(0, 8)}…
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {app.company_name || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {app.pipeline_stage ? (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            STAGE_STYLES[app.pipeline_stage] ?? "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {app.pipeline_stage}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -159,21 +226,48 @@ export default function ApplicationsPage() {
           <ul className="sm:hidden divide-y divide-gray-200">
             {applications.map((app) => (
               <li key={app.id} className="px-4 py-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-gray-500">
-                    Job: {app.job_posting_id.slice(0, 8)}…
-                  </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    {app.job_title && app.job_slug ? (
+                      <Link
+                        href={`/jobs/${app.job_slug}`}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                      >
+                        {app.job_title}
+                      </Link>
+                    ) : app.job_title ? (
+                      <p className="text-sm font-medium text-gray-900">{app.job_title}</p>
+                    ) : (
+                      <p className="font-mono text-xs text-gray-500">
+                        Job: {app.job_posting_id.slice(0, 8)}…
+                      </p>
+                    )}
+                    {app.company_name && (
+                      <p className="text-xs text-gray-500">{app.company_name}</p>
+                    )}
+                  </div>
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                    className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
                       STATUS_STYLES[app.status] ?? "bg-gray-100 text-gray-700"
                     }`}
                   >
                     {app.status}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Applied {new Date(app.applied_at).toLocaleDateString()}
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  {app.pipeline_stage && (
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        STAGE_STYLES[app.pipeline_stage] ?? "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {app.pipeline_stage}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-400">
+                    Applied {new Date(app.applied_at).toLocaleDateString()}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>

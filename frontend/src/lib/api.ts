@@ -137,6 +137,22 @@ export const apiClient = {
     return handleResponse<T>(response);
   },
 
+  async patch<T>(
+    path: string,
+    body?: Record<string, unknown>
+  ): Promise<ApiResponse<T>> {
+    const response = await fetch(buildUrl(path), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...authHeaders(),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return handleResponse<T>(response);
+  },
+
   async del<T>(path: string): Promise<ApiResponse<T>> {
     const response = await fetch(buildUrl(path), {
       method: "DELETE",

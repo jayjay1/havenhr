@@ -28,6 +28,7 @@ class JobApplication extends Model
         'job_posting_id',
         'resume_id',
         'resume_snapshot',
+        'pipeline_stage_id',
         'status',
         'applied_at',
     ];
@@ -82,5 +83,21 @@ class JobApplication extends Model
     public function resume(): BelongsTo
     {
         return $this->belongsTo(Resume::class);
+    }
+
+    /**
+     * Get the job posting this application is for.
+     */
+    public function jobPosting(): BelongsTo
+    {
+        return $this->belongsTo(JobPosting::class);
+    }
+
+    /**
+     * Get the current pipeline stage for this application.
+     */
+    public function pipelineStage(): BelongsTo
+    {
+        return $this->belongsTo(PipelineStage::class, 'pipeline_stage_id');
     }
 }

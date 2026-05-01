@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Events\ApplicationStageChanged;
+use App\Events\JobPostingCreated;
+use App\Events\JobPostingDeleted;
+use App\Events\JobPostingStatusChanged;
+use App\Events\JobPostingUpdated;
 use App\Events\RoleAssigned;
 use App\Events\RoleChanged;
 use App\Events\TenantCreated;
@@ -43,6 +48,21 @@ class EventServiceProvider extends ServiceProvider
             AuditLogListener::class,
         ],
         RoleChanged::class => [
+            AuditLogListener::class,
+        ],
+        JobPostingCreated::class => [
+            AuditLogListener::class,
+        ],
+        JobPostingUpdated::class => [
+            AuditLogListener::class,
+        ],
+        JobPostingStatusChanged::class => [
+            AuditLogListener::class,
+        ],
+        JobPostingDeleted::class => [
+            AuditLogListener::class,
+        ],
+        ApplicationStageChanged::class => [
             AuditLogListener::class,
         ],
     ];

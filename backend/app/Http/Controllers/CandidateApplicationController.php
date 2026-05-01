@@ -32,6 +32,8 @@ class CandidateApplicationController extends Controller
                 $request->input('job_posting_id'),
                 $request->input('resume_id'),
             );
+        } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
+            throw $e; // Re-throw abort() responses
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'error' => [

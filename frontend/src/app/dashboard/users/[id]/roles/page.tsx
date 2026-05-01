@@ -23,7 +23,7 @@ const ALL_ROLES: UserRole[] = [
  * Get the roles that the requesting user can assign based on their own role.
  * Owner can assign all roles. Admin can assign all except Owner.
  */
-export function getAssignableRoles(requestingUserRole: UserRole): UserRole[] {
+function getAssignableRoles(requestingUserRole: UserRole): UserRole[] {
   if (requestingUserRole === "owner") {
     return ALL_ROLES;
   }
