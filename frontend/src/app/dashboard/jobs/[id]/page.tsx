@@ -8,9 +8,14 @@ import {
   fetchJobDetail,
   fetchJobApplications,
   transitionJobStatus,
-  moveApplication,
 } from "@/lib/jobApi";
-import type { JobPosting, JobStatus, EmployerJobApplication } from "@/types/job";
+import {
+  KanbanProvider,
+  useKanban,
+  type KanbanStage,
+} from "@/components/pipeline/KanbanProvider";
+import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
+import type { JobPosting, JobStatus } from "@/types/job";
 
 const STATUS_BADGE: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
@@ -58,13 +63,60 @@ function getAvailableTransitions(status: JobStatus): { label: string; target: Jo
   }
 }
 
+/** Wrapper that loads pipeline data and dispatches it to KanbanProvider. */
+function KanbanBoardWrapper({ jobId }: { jobId: string }) {
+  const { state, dispatch } = useKanban();
+  const { hasPermission } = useAuth();
+
+  const canManage = hasPermission("pipeline.manage");
+  const canCustomize = hasPermission("pipeline.manage");
+
+  const loadData = useCallback(async () => {
+    dispatch({ type: "SET_LOADING", isLoading: true });
+    try {
+      const [jobRes, appsRes] = await Promise.all([
+        fetchJobDetail(jobId),
+        fetchJobApplications(jobId, { per_page: 100 }),
+      ]);
+
+      const job = jobRes.data;
+      const applications = appsRes.data;
+      const totalCandidates = appsRes.meta?.total ?? applications.length;
+
+      const kanbanStages: KanbanStage[] = (job.pipeline_stages || []).map(stage => ({
+        id: stage.id,
+        name: stage.name,
+        color: (stage as unknown as { color?: string | null }).color ?? null,
+        sort_order: stage.sort_order,
+        applications: applications.filter(app => app.current_stage === stage.name),
+      }));
+
+      dispatch({ type: "SET_DATA", stages: kanbanStages, totalCandidates });
+    } catch {
+      dispatch({ type: "SET_ERROR", error: "Failed to load pipeline data." });
+    }
+  }, [jobId, dispatch]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  return (
+    <KanbanBoard
+      jobId={jobId}
+      canManage={canManage}
+      canCustomize={canCustomize}
+      onRetry={loadData}
+    />
+  );
+}
+
 export default function EmployerJobDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { hasPermission } = useAuth();
 
   const [job, setJob] = useState<JobPosting | null>(null);
-  const [applications, setApplications] = useState<EmployerJobApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -73,12 +125,8 @@ export default function EmployerJobDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const [jobRes, appsRes] = await Promise.all([
-        fetchJobDetail(id),
-        fetchJobApplications(id, { per_page: 100 }),
-      ]);
+      const jobRes = await fetchJobDetail(id);
       setJob(jobRes.data);
-      setApplications(appsRes.data);
     } catch {
       setError("Failed to load job details.");
     } finally {
@@ -102,15 +150,6 @@ export default function EmployerJobDetailPage() {
     }
   }
 
-  async function handleMoveApplication(appId: string, stageId: string) {
-    try {
-      await moveApplication(appId, stageId);
-      await loadData();
-    } catch {
-      setError("Failed to move application.");
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -131,14 +170,7 @@ export default function EmployerJobDetailPage() {
 
   if (!job) return null;
 
-  const stages = job.pipeline_stages || [];
   const transitions = getAvailableTransitions(job.status);
-
-  // Group applications by their current stage
-  const appsByStage: Record<string, EmployerJobApplication[]> = {};
-  for (const stage of stages) {
-    appsByStage[stage.name] = applications.filter((a) => a.current_stage === stage.name);
-  }
 
   return (
     <div>
@@ -227,75 +259,12 @@ export default function EmployerJobDetailPage() {
         </div>
       </div>
 
-      {/* Pipeline stages */}
+      {/* Kanban pipeline board */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Hiring Pipeline</h2>
-
-        {stages.length === 0 ? (
-          <p className="text-sm text-gray-500">No pipeline stages configured.</p>
-        ) : (
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {stages.map((stage) => {
-              const stageApps = appsByStage[stage.name] || [];
-              return (
-                <div
-                  key={stage.id}
-                  className="shrink-0 w-64 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="px-4 py-3 border-b border-gray-200 bg-white rounded-t-lg">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-gray-900">{stage.name}</h3>
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                        {stage.application_count}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-2 space-y-2 min-h-[100px] max-h-[400px] overflow-y-auto">
-                    {stageApps.length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-4">No applicants</p>
-                    )}
-                    {stageApps.map((app) => (
-                      <div
-                        key={app.id}
-                        className="bg-white rounded-md border border-gray-200 p-3 shadow-sm"
-                      >
-                        <p className="text-sm font-medium text-gray-900">{app.candidate_name}</p>
-                        <p className="text-xs text-gray-500">{app.candidate_email}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Applied {new Date(app.applied_at).toLocaleDateString()}
-                        </p>
-                        {/* Move to stage dropdown */}
-                        {hasPermission("pipeline.manage") && (
-                          <div className="mt-2">
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handleMoveApplication(app.id, e.target.value);
-                                }
-                              }}
-                              className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                              aria-label={`Move ${app.candidate_name} to stage`}
-                            >
-                              <option value="">Move to…</option>
-                              {stages
-                                .filter((s) => s.name !== stage.name)
-                                .map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.name}
-                                  </option>
-                                ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <KanbanProvider>
+          <KanbanBoardWrapper jobId={id} />
+        </KanbanProvider>
       </div>
 
       {/* Job description section */}

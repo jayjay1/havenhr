@@ -29,6 +29,7 @@ class PipelineStage extends Model
     protected $fillable = [
         'job_posting_id',
         'name',
+        'color',
         'sort_order',
     ];
 

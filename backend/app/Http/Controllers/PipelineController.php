@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\AddPipelineStageRequest;
+use App\Http\Requests\BulkMoveRequest;
+use App\Http\Requests\BulkRejectRequest;
 use App\Http\Requests\MoveApplicationRequest;
 use App\Http\Requests\ReorderPipelineStagesRequest;
+use App\Http\Requests\UpdatePipelineStageRequest;
 use App\Models\JobPosting;
 use App\Models\PipelineStage;
 use App\Services\PipelineService;
@@ -36,6 +39,7 @@ class PipelineController extends Controller
             'data' => $stages->map(fn ($stage) => [
                 'id' => $stage->id,
                 'name' => $stage->name,
+                'color' => $stage->color,
                 'sort_order' => $stage->sort_order,
                 'application_count' => $stage->job_applications_count ?? 0,
             ])->values()->toArray(),
@@ -138,6 +142,72 @@ class PipelineController extends Controller
                 'to_stage_id' => $transition->to_stage_id,
                 'moved_by' => $transition->moved_by,
                 'moved_at' => $transition->moved_at->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Bulk move applications to a target stage.
+     *
+     * POST /api/v1/applications/bulk-move
+     */
+    public function bulkMove(BulkMoveRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $result = $this->pipelineService->bulkMove(
+            $request->validated()['application_ids'],
+            $request->validated()['stage_id'],
+            $user->id,
+        );
+
+        return response()->json([
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Bulk reject applications.
+     *
+     * POST /api/v1/applications/bulk-reject
+     */
+    public function bulkReject(BulkRejectRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $result = $this->pipelineService->bulkReject(
+            $request->validated()['application_ids'],
+            $user->id,
+        );
+
+        return response()->json([
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Update a pipeline stage's name and/or color.
+     *
+     * PATCH /api/v1/jobs/{jobId}/stages/{stageId}
+     */
+    public function updateStage(UpdatePipelineStageRequest $request, string $jobId, string $stageId): JsonResponse
+    {
+        // Verify job posting exists in tenant scope
+        JobPosting::findOrFail($jobId);
+
+        // Verify stage belongs to this job posting
+        $stage = PipelineStage::where('id', $stageId)
+            ->where('job_posting_id', $jobId)
+            ->firstOrFail();
+
+        $updatedStage = $this->pipelineService->updateStage($stageId, $request->validated());
+
+        return response()->json([
+            'data' => [
+                'id' => $updatedStage->id,
+                'name' => $updatedStage->name,
+                'color' => $updatedStage->color,
+                'sort_order' => $updatedStage->sort_order,
             ],
         ]);
     }

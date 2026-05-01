@@ -57,6 +57,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/jobs/{jobId}/stages', [PipelineController::class, 'listStages'])->middleware('rbac:jobs.view');
         Route::post('/jobs/{jobId}/stages', [PipelineController::class, 'addStage'])->middleware('rbac:pipeline.manage');
         Route::put('/jobs/{jobId}/stages/reorder', [PipelineController::class, 'reorderStages'])->middleware('rbac:pipeline.manage');
+        Route::patch('/jobs/{jobId}/stages/{stageId}', [PipelineController::class, 'updateStage'])->middleware('rbac:pipeline.manage');
         Route::delete('/jobs/{jobId}/stages/{stageId}', [PipelineController::class, 'removeStage'])->middleware('rbac:pipeline.manage');
 
         // Employer application endpoints (tenant-scoped) — must be before /jobs/{id}
@@ -69,6 +70,10 @@ Route::prefix('v1')->group(function () {
         Route::put('/jobs/{id}', [JobPostingController::class, 'update'])->middleware('rbac:jobs.update');
         Route::delete('/jobs/{id}', [JobPostingController::class, 'destroy'])->middleware('rbac:jobs.delete');
         Route::patch('/jobs/{id}/status', [JobPostingController::class, 'transitionStatus'])->middleware('rbac:jobs.update');
+
+        // Bulk pipeline operations (tenant-scoped) — must be before /applications/{appId} routes
+        Route::post('/applications/bulk-move', [PipelineController::class, 'bulkMove'])->middleware('rbac:applications.manage');
+        Route::post('/applications/bulk-reject', [PipelineController::class, 'bulkReject'])->middleware('rbac:applications.manage');
 
         // Application stage transitions (tenant-scoped)
         Route::post('/applications/{appId}/move', [PipelineController::class, 'moveApplication'])->middleware('rbac:applications.manage');

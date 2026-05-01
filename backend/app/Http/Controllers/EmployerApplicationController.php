@@ -23,10 +23,33 @@ class EmployerApplicationController extends Controller
         $page = max(1, (int) $request->query('page', 1));
         $perPage = min(100, max(1, (int) $request->query('per_page', 20)));
 
-        $paginator = JobApplication::where('job_posting_id', $jobId)
-            ->with(['candidate', 'pipelineStage'])
-            ->orderByDesc('applied_at')
-            ->paginate($perPage, ['*'], 'page', $page);
+        $query = JobApplication::where('job_applications.job_posting_id', $jobId)
+            ->with(['candidate', 'pipelineStage']);
+
+        // Search by candidate name or email
+        $searchQuery = $request->query('q');
+        if ($searchQuery) {
+            $query->join('candidates', 'job_applications.candidate_id', '=', 'candidates.id')
+                ->where(function ($q) use ($searchQuery) {
+                    $q->where('candidates.name', 'LIKE', '%' . $searchQuery . '%')
+                        ->orWhere('candidates.email', 'LIKE', '%' . $searchQuery . '%');
+                })
+                ->select('job_applications.*');
+        }
+
+        // Sort
+        $sort = $request->query('sort', 'applied_at');
+        if ($sort === 'candidate_name') {
+            if (! $searchQuery) {
+                $query->join('candidates', 'job_applications.candidate_id', '=', 'candidates.id')
+                    ->select('job_applications.*');
+            }
+            $query->orderBy('candidates.name', 'asc');
+        } else {
+            $query->orderByDesc('job_applications.applied_at');
+        }
+
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => collect($paginator->items())->map(fn ($app) => [

@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Events\ApplicationStageChanged;
 use App\Models\JobApplication;
+use App\Models\JobPosting;
 use App\Models\PipelineStage;
 use App\Models\StageTransition;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class PipelineService
 {
@@ -143,6 +145,7 @@ class PipelineService
                 'application_id' => $applicationId,
                 'from_stage' => $fromStageId,
                 'to_stage' => $targetStageId,
+                'notification_eligible' => true,
             ],
         ));
 
@@ -158,5 +161,158 @@ class PipelineService
             ->with(['fromStage', 'toStage', 'movedBy'])
             ->orderBy('moved_at', 'asc')
             ->get();
+    }
+
+    /**
+     * Move multiple applications to a target stage in a single transaction.
+     *
+     * @return array{success_count: int, failed_count: int, failed_ids: array<string>}
+     */
+    public function bulkMove(array $applicationIds, string $targetStageId, string $userId): array
+    {
+        $targetStage = PipelineStage::findOrFail($targetStageId);
+
+        $successCount = 0;
+        $failedIds = [];
+
+        DB::transaction(function () use ($applicationIds, $targetStage, $userId, &$successCount, &$failedIds) {
+            $applications = JobApplication::whereIn('id', $applicationIds)->get();
+
+            foreach ($applicationIds as $appId) {
+                $application = $applications->firstWhere('id', $appId);
+
+                if (! $application || $application->job_posting_id !== $targetStage->job_posting_id) {
+                    $failedIds[] = $appId;
+
+                    continue;
+                }
+
+                $fromStageId = $application->pipeline_stage_id;
+
+                $application->pipeline_stage_id = $targetStage->id;
+                $application->save();
+
+                StageTransition::create([
+                    'job_application_id' => $appId,
+                    'from_stage_id' => $fromStageId,
+                    'to_stage_id' => $targetStage->id,
+                    'moved_by' => $userId,
+                    'moved_at' => Carbon::now(),
+                ]);
+
+                $tenantId = $application->jobPosting->tenant_id ?? 'platform';
+
+                event(new ApplicationStageChanged(
+                    $tenantId,
+                    $userId,
+                    [
+                        'application_id' => $appId,
+                        'from_stage' => $fromStageId,
+                        'to_stage' => $targetStage->id,
+                        'notification_eligible' => true,
+                    ],
+                ));
+
+                $successCount++;
+            }
+        });
+
+        return [
+            'success_count' => $successCount,
+            'failed_count' => count($failedIds),
+            'failed_ids' => $failedIds,
+        ];
+    }
+
+    /**
+     * Move multiple applications to their respective job posting's Rejected stage.
+     *
+     * @return array{success_count: int, failed_count: int, failed_ids: array<string>}
+     */
+    public function bulkReject(array $applicationIds, string $userId): array
+    {
+        $successCount = 0;
+        $failedIds = [];
+
+        DB::transaction(function () use ($applicationIds, $userId, &$successCount, &$failedIds) {
+            $applications = JobApplication::whereIn('id', $applicationIds)->with('jobPosting')->get();
+
+            foreach ($applicationIds as $appId) {
+                $application = $applications->firstWhere('id', $appId);
+
+                if (! $application) {
+                    $failedIds[] = $appId;
+
+                    continue;
+                }
+
+                $rejectedStage = PipelineStage::where('job_posting_id', $application->job_posting_id)
+                    ->where('name', 'Rejected')
+                    ->first();
+
+                if (! $rejectedStage) {
+                    $failedIds[] = $appId;
+
+                    continue;
+                }
+
+                $fromStageId = $application->pipeline_stage_id;
+
+                $application->pipeline_stage_id = $rejectedStage->id;
+                $application->save();
+
+                StageTransition::create([
+                    'job_application_id' => $appId,
+                    'from_stage_id' => $fromStageId,
+                    'to_stage_id' => $rejectedStage->id,
+                    'moved_by' => $userId,
+                    'moved_at' => Carbon::now(),
+                ]);
+
+                $tenantId = $application->jobPosting->tenant_id ?? 'platform';
+
+                event(new ApplicationStageChanged(
+                    $tenantId,
+                    $userId,
+                    [
+                        'application_id' => $appId,
+                        'from_stage' => $fromStageId,
+                        'to_stage' => $rejectedStage->id,
+                        'notification_eligible' => true,
+                    ],
+                ));
+
+                $successCount++;
+            }
+        });
+
+        return [
+            'success_count' => $successCount,
+            'failed_count' => count($failedIds),
+            'failed_ids' => $failedIds,
+        ];
+    }
+
+    /**
+     * Update a pipeline stage's name and/or color.
+     */
+    public function updateStage(string $stageId, array $data): PipelineStage
+    {
+        $stage = PipelineStage::findOrFail($stageId);
+
+        // Verify the stage belongs to a job posting in the current tenant
+        $jobPosting = JobPosting::findOrFail($stage->job_posting_id);
+
+        if (isset($data['name'])) {
+            $stage->name = $data['name'];
+        }
+
+        if (array_key_exists('color', $data)) {
+            $stage->color = $data['color'];
+        }
+
+        $stage->save();
+
+        return $stage;
     }
 }

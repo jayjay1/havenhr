@@ -156,3 +156,19 @@ export interface CreateJobPostingPayload {
  * Payload for updating a job posting.
  */
 export type UpdateJobPostingPayload = Partial<CreateJobPostingPayload>;
+
+/**
+ * Extended pipeline stage with color support.
+ */
+export interface PipelineStageDetail extends PipelineStage {
+  color: string | null;
+}
+
+/**
+ * Result of a bulk action (move or reject).
+ */
+export interface BulkActionResult {
+  success_count: number;
+  failed_count: number;
+  failed_ids: string[];
+}
