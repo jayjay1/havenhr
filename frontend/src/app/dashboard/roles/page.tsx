@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { apiClient, ApiRequestError } from "@/lib/api";
 import type { Role } from "@/types/permission";
 
@@ -87,9 +88,10 @@ export default function RolesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {roles.map((role) => (
-            <div
+            <Link
               key={role.id}
-              className="bg-white rounded-lg border border-gray-200 p-5"
+              href={`/dashboard/roles/${role.id}`}
+              className="block bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-300 hover:shadow-sm transition-all"
             >
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-lg font-semibold text-gray-900">
@@ -104,7 +106,7 @@ export default function RolesPage() {
               <p className="text-sm text-gray-500">
                 {role.description || "No description"}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       )}

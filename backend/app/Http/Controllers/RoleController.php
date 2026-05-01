@@ -42,13 +42,13 @@ class RoleController extends Controller
     }
 
     /**
-     * Display a single role.
+     * Display a single role with its permissions.
      *
      * GET /api/v1/roles/{id}
      */
     public function show(string $id): JsonResponse
     {
-        $role = Role::find($id);
+        $role = Role::with('permissions')->find($id);
 
         if (! $role) {
             return response()->json([
@@ -60,7 +60,21 @@ class RoleController extends Controller
         }
 
         return response()->json([
-            'data' => $role,
+            'data' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'description' => $role->description,
+                'is_system_default' => $role->is_system_default,
+                'permissions' => $role->permissions->map(function ($permission) {
+                    return [
+                        'id' => $permission->id,
+                        'name' => $permission->name,
+                        'resource' => $permission->resource,
+                        'action' => $permission->action,
+                        'description' => $permission->description,
+                    ];
+                })->values()->toArray(),
+            ],
         ]);
     }
 

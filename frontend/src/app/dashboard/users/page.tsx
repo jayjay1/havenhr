@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiClient, ApiRequestError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { InviteUserModal } from "@/components/dashboard/InviteUserModal";
 import type { User } from "@/types/user";
 import type { PaginatedResponse } from "@/types/api";
 
@@ -136,6 +137,9 @@ export default function UsersPage() {
   const [meta, setMeta] = useState<PaginatedResponse<User>["meta"] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+
+  const canCreateUsers = hasPermission("users.create");
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -168,6 +172,13 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  // Open modal when URL has ?action=invite
+  useEffect(() => {
+    if (searchParams.get("action") === "invite" && canCreateUsers) {
+      setInviteModalOpen(true);
+    }
+  }, [searchParams, canCreateUsers]);
+
   function handlePageChange(newPage: number) {
     const params = new URLSearchParams();
     params.set("page", String(newPage));
@@ -175,16 +186,50 @@ export default function UsersPage() {
     router.push(`/dashboard/users?${params.toString()}`);
   }
 
+  function handleInviteSuccess() {
+    fetchUsers();
+  }
+
+  function handleInviteClose() {
+    setInviteModalOpen(false);
+    // Remove action=invite from URL if present
+    if (searchParams.get("action") === "invite") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("action");
+      const qs = params.toString();
+      router.push(`/dashboard/users${qs ? `?${qs}` : ""}`);
+    }
+  }
+
   const canManageRoles = hasPermission("manage_roles");
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage users in your organization.
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage users in your organization.
+          </p>
+        </div>
+        {canCreateUsers && (
+          <button
+            type="button"
+            onClick={() => setInviteModalOpen(true)}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          >
+            Invite User
+          </button>
+        )}
       </div>
+
+      {canCreateUsers && (
+        <InviteUserModal
+          isOpen={inviteModalOpen}
+          onClose={handleInviteClose}
+          onSuccess={handleInviteSuccess}
+        />
+      )}
 
       {error && (
         <div role="alert" className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">

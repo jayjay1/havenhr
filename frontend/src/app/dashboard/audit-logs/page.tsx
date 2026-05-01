@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiClient, ApiRequestError } from "@/lib/api";
+import {
+  AuditLogFilterBar,
+  type AuditLogFilters,
+} from "@/components/dashboard/AuditLogFilterBar";
 
 interface AuditLog {
   id: string;
@@ -68,6 +72,21 @@ export default function AuditLogsPage() {
   const page = Number(searchParams.get("page")) || 1;
   const perPage = 20;
 
+  // Read filters from URL params
+  const filters: AuditLogFilters = {
+    action: searchParams.get("action") || undefined,
+    from: searchParams.get("from") || undefined,
+    to: searchParams.get("to") || undefined,
+    user_id: searchParams.get("user_id") || undefined,
+  };
+
+  const hasActiveFilters = !!(
+    filters.action ||
+    filters.from ||
+    filters.to ||
+    filters.user_id
+  );
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [meta, setMeta] = useState<PaginatedAuditLogs["meta"] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,8 +96,16 @@ export default function AuditLogsPage() {
     setLoading(true);
     setError("");
     try {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("per_page", String(perPage));
+      if (filters.action) params.set("action", filters.action);
+      if (filters.from) params.set("from", filters.from);
+      if (filters.to) params.set("to", filters.to);
+      if (filters.user_id) params.set("user_id", filters.user_id);
+
       const response = await apiClient.get<PaginatedAuditLogs>(
-        `/audit-logs?page=${page}&per_page=${perPage}`
+        `/audit-logs?${params.toString()}`
       );
       const paginated = response.data;
       if (paginated && Array.isArray(paginated.data)) {
@@ -98,14 +125,48 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filters.action, filters.from, filters.to, filters.user_id]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
+  function updateUrl(newParams: Record<string, string | undefined>) {
+    const params = new URLSearchParams();
+
+    // Merge current filters with new values
+    const merged = { ...filters, ...newParams };
+
+    if (merged.action) params.set("action", merged.action);
+    if (merged.from) params.set("from", merged.from);
+    if (merged.to) params.set("to", merged.to);
+    if (merged.user_id) params.set("user_id", merged.user_id);
+
+    // Reset page to 1 on filter change
+    params.set("page", "1");
+
+    router.push(`/dashboard/audit-logs?${params.toString()}`);
+  }
+
+  function handleFilterChange(
+    changedFilters: Record<string, string | undefined>
+  ) {
+    updateUrl(changedFilters);
+  }
+
+  function handleClearFilters() {
+    router.push("/dashboard/audit-logs");
+  }
+
   function handlePageChange(newPage: number) {
-    router.push(`/dashboard/audit-logs?page=${newPage}`);
+    const params = new URLSearchParams();
+    params.set("page", String(newPage));
+    if (filters.action) params.set("action", filters.action);
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.user_id) params.set("user_id", filters.user_id);
+    router.push(`/dashboard/audit-logs?${params.toString()}`);
   }
 
   return (
@@ -117,8 +178,18 @@ export default function AuditLogsPage() {
         </p>
       </div>
 
+      <AuditLogFilterBar
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClear={handleClearFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
+
       {error && (
-        <div role="alert" className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"
+        >
           {error}
         </div>
       )}
@@ -142,10 +213,30 @@ export default function AuditLogsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resource</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                  >
+                    Action
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                  >
+                    Resource
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                  >
+                    IP Address
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                  >
+                    Timestamp
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -177,14 +268,23 @@ export default function AuditLogsPage() {
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {logs.map((log) => (
-              <div key={log.id} className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+              <div
+                key={log.id}
+                className="bg-white rounded-lg border border-gray-200 p-4 space-y-2"
+              >
                 <div className="flex items-center justify-between">
                   <ActionBadge action={log.action} />
-                  <span className="text-xs text-gray-400">{formatDate(log.created_at)}</span>
+                  <span className="text-xs text-gray-400">
+                    {formatDate(log.created_at)}
+                  </span>
                 </div>
                 <p className="text-sm text-gray-600">
                   {log.resource_type}
-                  {log.ip_address && <span className="text-gray-400 ml-2">from {log.ip_address}</span>}
+                  {log.ip_address && (
+                    <span className="text-gray-400 ml-2">
+                      from {log.ip_address}
+                    </span>
+                  )}
                 </p>
               </div>
             ))}
@@ -192,11 +292,16 @@ export default function AuditLogsPage() {
 
           {/* Pagination */}
           {meta && meta.last_page > 1 && (
-            <nav aria-label="Pagination" className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 mt-4 rounded-lg sm:px-6">
+            <nav
+              aria-label="Pagination"
+              className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 mt-4 rounded-lg sm:px-6"
+            >
               <div className="hidden sm:block">
                 <p className="text-sm text-gray-700">
-                  Page <span className="font-medium">{meta.current_page}</span> of{" "}
-                  <span className="font-medium">{meta.last_page}</span> ({meta.total} total)
+                  Page{" "}
+                  <span className="font-medium">{meta.current_page}</span> of{" "}
+                  <span className="font-medium">{meta.last_page}</span> (
+                  {meta.total} total)
                 </p>
               </div>
               <div className="flex flex-1 justify-between sm:justify-end gap-2">

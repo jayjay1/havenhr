@@ -6,6 +6,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\CandidateAuthController;
 use App\Http\Controllers\CandidateProfileController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployerApplicationController;
 use App\Http\Controllers\JobPostingController;
 use App\Http\Controllers\PipelineController;
@@ -82,6 +84,14 @@ Route::prefix('v1')->group(function () {
         // Employer application detail and talent pool (tenant-scoped)
         Route::get('/applications/{id}', [EmployerApplicationController::class, 'show'])->middleware('rbac:applications.view');
         Route::get('/talent-pool', [EmployerApplicationController::class, 'talentPool'])->middleware('rbac:applications.view');
+
+        // Dashboard metrics
+        Route::get('/dashboard/metrics', [DashboardController::class, 'metrics']);
+        Route::get('/dashboard/applications-by-stage', [DashboardController::class, 'applicationsByStage']);
+
+        // Company settings
+        Route::get('/company', [CompanyController::class, 'show']);
+        Route::put('/company', [CompanyController::class, 'update'])->middleware('rbac:tenant.update');
     });
 
     // Candidate auth endpoints
