@@ -46,6 +46,13 @@ interface StageCount {
   count: number;
 }
 
+/**
+ * Check whether an error is a 403 permission-denied response.
+ */
+function isPermissionDenied(err: unknown): boolean {
+  return err instanceof ApiRequestError && err.status === 403;
+}
+
 /** SVG icon components for stat cards */
 function BriefcaseIcon() {
   return (
@@ -79,13 +86,30 @@ function ChartIcon() {
   );
 }
 
+/**
+ * Subtle info banner for permission-denied or access-restricted sections.
+ */
+function PermissionNotice({ message }: { message: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-gray-50 border border-gray-200 px-4 py-3">
+      <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+      </svg>
+      <p className="text-sm text-gray-500">{message}</p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { user, hasPermission, isLoading: authLoading } = useAuth();
+
+  const canViewAuditLogs = hasPermission("audit_logs.view");
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [metricsError, setMetricsError] = useState("");
+  const [metricsDenied, setMetricsDenied] = useState(false);
 
   // Activity feed state
   const [activityLogs, setActivityLogs] = useState<AuditLog[]>([]);
@@ -96,15 +120,19 @@ export default function DashboardPage() {
   const [stageData, setStageData] = useState<StageCount[]>([]);
   const [stageLoading, setStageLoading] = useState(true);
   const [stageError, setStageError] = useState("");
+  const [stageDenied, setStageDenied] = useState(false);
 
   const fetchMetrics = useCallback(async () => {
     setMetricsLoading(true);
     setMetricsError("");
+    setMetricsDenied(false);
     try {
       const response = await apiClient.get<DashboardMetrics>("/dashboard/metrics");
       setMetrics(response.data);
     } catch (err) {
-      if (err instanceof ApiRequestError) {
+      if (isPermissionDenied(err)) {
+        setMetricsDenied(true);
+      } else if (err instanceof ApiRequestError) {
         setMetricsError(err.message || "Failed to load metrics.");
       } else {
         setMetricsError("Failed to load metrics.");
@@ -115,6 +143,11 @@ export default function DashboardPage() {
   }, []);
 
   const fetchActivity = useCallback(async () => {
+    // Skip fetch entirely if user lacks audit_logs.view permission
+    if (!canViewAuditLogs) {
+      setActivityLoading(false);
+      return;
+    }
     setActivityLoading(true);
     setActivityError("");
     try {
@@ -128,7 +161,10 @@ export default function DashboardPage() {
         setActivityLogs([]);
       }
     } catch (err) {
-      if (err instanceof ApiRequestError) {
+      // If we somehow still get a 403, handle it gracefully
+      if (isPermissionDenied(err)) {
+        setActivityError("");
+      } else if (err instanceof ApiRequestError) {
         setActivityError(err.message || "Failed to load activity.");
       } else {
         setActivityError("Failed to load activity.");
@@ -136,16 +172,19 @@ export default function DashboardPage() {
     } finally {
       setActivityLoading(false);
     }
-  }, []);
+  }, [canViewAuditLogs]);
 
   const fetchStageData = useCallback(async () => {
     setStageLoading(true);
     setStageError("");
+    setStageDenied(false);
     try {
       const response = await apiClient.get<StageCount[]>("/dashboard/applications-by-stage");
       setStageData(response.data);
     } catch (err) {
-      if (err instanceof ApiRequestError) {
+      if (isPermissionDenied(err)) {
+        setStageDenied(true);
+      } else if (err instanceof ApiRequestError) {
         setStageError(err.message || "Failed to load chart data.");
       } else {
         setStageError("Failed to load chart data.");
@@ -180,37 +219,40 @@ export default function DashboardPage() {
         {/* Left column */}
         <div className="space-y-6">
           {/* Stat cards */}
-          {metricsError && (
+          {metricsDenied ? (
+            <PermissionNotice message="You don't have access to dashboard metrics." />
+          ) : metricsError ? (
             <div role="alert" className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
               {metricsError}
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <StatCard
+                label="Open Jobs"
+                value={metrics?.open_jobs_count ?? 0}
+                icon={<BriefcaseIcon />}
+                loading={metricsLoading}
+              />
+              <StatCard
+                label="Total Candidates"
+                value={metrics?.total_candidates ?? 0}
+                icon={<UsersIcon />}
+                loading={metricsLoading}
+              />
+              <StatCard
+                label="Applications This Week"
+                value={metrics?.applications_this_week ?? 0}
+                icon={<DocumentIcon />}
+                loading={metricsLoading}
+              />
+              <StatCard
+                label="Pipeline Conversion Rate"
+                value={metrics ? `${metrics.pipeline_conversion_rate}%` : "0%"}
+                icon={<ChartIcon />}
+                loading={metricsLoading}
+              />
+            </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatCard
-              label="Open Jobs"
-              value={metrics?.open_jobs_count ?? 0}
-              icon={<BriefcaseIcon />}
-              loading={metricsLoading}
-            />
-            <StatCard
-              label="Total Candidates"
-              value={metrics?.total_candidates ?? 0}
-              icon={<UsersIcon />}
-              loading={metricsLoading}
-            />
-            <StatCard
-              label="Applications This Week"
-              value={metrics?.applications_this_week ?? 0}
-              icon={<DocumentIcon />}
-              loading={metricsLoading}
-            />
-            <StatCard
-              label="Pipeline Conversion Rate"
-              value={metrics ? `${metrics.pipeline_conversion_rate}%` : "0%"}
-              icon={<ChartIcon />}
-              loading={metricsLoading}
-            />
-          </div>
 
           {/* Quick Actions */}
           <div className="rounded-lg border border-gray-200 bg-white p-6">
@@ -233,7 +275,7 @@ export default function DashboardPage() {
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                  </svg>
+                </svg>
                 View Pipeline
               </a>
               {hasPermission("users.create") && (
@@ -247,28 +289,62 @@ export default function DashboardPage() {
                   Invite User
                 </a>
               )}
+              {hasPermission("reports.view") && (
+                <a
+                  href="/dashboard/reports"
+                  className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                  </svg>
+                  View Reports
+                </a>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right column */}
         <div className="space-y-6">
-          {/* Activity Feed */}
-          {activityError ? (
+          {/* Activity Feed — only shown for users with audit_logs.view permission */}
+          {canViewAuditLogs ? (
+            activityError ? (
+              <div className="rounded-lg border border-gray-200 bg-white">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+                </div>
+                <div className="px-6 py-8 text-center">
+                  <p className="text-sm text-red-600">{activityError}</p>
+                </div>
+              </div>
+            ) : (
+              <ActivityFeed logs={activityLogs} loading={activityLoading} />
+            )
+          ) : (
             <div className="rounded-lg border border-gray-200 bg-white">
               <div className="border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
               </div>
               <div className="px-6 py-8 text-center">
-                <p className="text-sm text-red-600">{activityError}</p>
+                <svg className="mx-auto h-8 w-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                <p className="text-sm text-gray-500">Activity feed requires audit log access.</p>
               </div>
             </div>
-          ) : (
-            <ActivityFeed logs={activityLogs} loading={activityLoading} />
           )}
 
           {/* Stage Chart */}
-          {stageError ? (
+          {stageDenied ? (
+            <div className="rounded-lg border border-gray-200 bg-white">
+              <div className="border-b border-gray-200 px-6 py-4">
+                <h2 className="text-lg font-semibold text-gray-900">Applications by Stage</h2>
+              </div>
+              <div className="px-6 py-8 text-center">
+                <PermissionNotice message="You don't have access to this section." />
+              </div>
+            </div>
+          ) : stageError ? (
             <div className="rounded-lg border border-gray-200 bg-white">
               <div className="border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold text-gray-900">Applications by Stage</h2>

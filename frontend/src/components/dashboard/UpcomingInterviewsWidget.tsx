@@ -29,16 +29,23 @@ export function UpcomingInterviewsWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
   const loadInterviews = useCallback(async () => {
     setLoading(true);
     setError("");
+    setPermissionDenied(false);
     try {
       const response = await fetchUpcomingInterviews();
       setInterviews(response.data);
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError ? err.message : "Failed to load upcoming interviews."
-      );
+      if (err instanceof ApiRequestError && err.status === 403) {
+        setPermissionDenied(true);
+      } else {
+        setError(
+          err instanceof ApiRequestError ? err.message : "Failed to load upcoming interviews."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -62,19 +69,25 @@ export function UpcomingInterviewsWidget() {
         </div>
       )}
 
-      {!loading && error && (
+      {!loading && permissionDenied && (
+        <div className="px-6 py-8 text-center">
+          <p className="text-sm text-gray-500">You don&apos;t have access to upcoming interviews.</p>
+        </div>
+      )}
+
+      {!loading && !permissionDenied && error && (
         <div className="px-6 py-8 text-center">
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
-      {!loading && !error && interviews.length === 0 && (
+      {!loading && !permissionDenied && !error && interviews.length === 0 && (
         <div className="px-6 py-8 text-center">
           <p className="text-sm text-gray-500">No upcoming interviews this week</p>
         </div>
       )}
 
-      {!loading && !error && interviews.length > 0 && (
+      {!loading && !permissionDenied && !error && interviews.length > 0 && (
         <ul className="divide-y divide-gray-100">
           {interviews.map((interview) => (
             <li key={interview.id} className="px-6 py-3 flex items-center justify-between gap-3">
