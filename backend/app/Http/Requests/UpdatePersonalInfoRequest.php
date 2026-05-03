@@ -17,6 +17,9 @@ class UpdatePersonalInfoRequest extends BaseFormRequest
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'linkedin_url' => ['sometimes', 'nullable', 'url', 'max:500'],
             'portfolio_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+            'professional_summary' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'github_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+            'is_profile_public' => ['sometimes', 'boolean'],
         ];
     }
 }

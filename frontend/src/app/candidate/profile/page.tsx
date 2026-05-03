@@ -10,9 +10,88 @@ import type {
   Education,
   Skill,
 } from "@/types/candidate";
+import { calculateProfileCompleteness } from "@/lib/profileCompleteness";
 
 // ---------------------------------------------------------------------------
-// Personal Info Section
+// Avatar Placeholder
+// ---------------------------------------------------------------------------
+
+function AvatarPlaceholder({ name }: { name: string }) {
+  const initial = name ? name.charAt(0).toUpperCase() : "?";
+  return (
+    <div
+      className="flex items-center justify-center h-20 w-20 rounded-full bg-teal-100 text-teal-700 text-3xl font-bold"
+      aria-label={`Avatar for ${name}`}
+    >
+      {initial}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Profile Completeness Indicator
+// ---------------------------------------------------------------------------
+
+function CompletenessIndicator({ percentage }: { percentage: number }) {
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-medium text-gray-700">Profile Completeness</span>
+        <span className="text-sm font-semibold text-teal-700">{percentage}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2.5">
+        <div
+          className="bg-teal-500 h-2.5 rounded-full transition-all duration-300"
+          style={{ width: `${percentage}%` }}
+          role="progressbar"
+          aria-valuenow={percentage}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Profile ${percentage}% complete`}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Profile Visibility Toggle
+// ---------------------------------------------------------------------------
+
+function ProfileVisibilityToggle({
+  isPublic,
+  onToggle,
+}: {
+  isPublic: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+      <div>
+        <p className="text-sm font-medium text-gray-900">Public Profile</p>
+        <p className="text-xs text-gray-500">Allow employers to view your profile</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isPublic}
+        onClick={() => onToggle(!isPublic)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+          isPublic ? "bg-teal-500" : "bg-gray-300"
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            isPublic ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Personal Info Section (extended with new fields)
 // ---------------------------------------------------------------------------
 
 function PersonalInfoSection({
@@ -28,12 +107,14 @@ function PersonalInfoSection({
     location: profile.location ?? "",
     linkedin_url: profile.linkedin_url ?? "",
     portfolio_url: profile.portfolio_url ?? "",
+    professional_summary: profile.professional_summary ?? "",
+    github_url: profile.github_url ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setSuccess(false);
   }
@@ -83,6 +164,24 @@ function PersonalInfoSection({
             <label htmlFor="pi-portfolio" className="block text-sm font-medium text-gray-700 mb-1">Portfolio URL</label>
             <input id="pi-portfolio" name="portfolio_url" type="url" value={form.portfolio_url} onChange={handleChange} placeholder="https://..." className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
           </div>
+          <div>
+            <label htmlFor="pi-github" className="block text-sm font-medium text-gray-700 mb-1">GitHub URL</label>
+            <input id="pi-github" name="github_url" type="url" value={form.github_url} onChange={handleChange} placeholder="https://github.com/..." className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="pi-summary" className="block text-sm font-medium text-gray-700 mb-1">Professional Summary</label>
+          <textarea
+            id="pi-summary"
+            name="professional_summary"
+            value={form.professional_summary}
+            onChange={handleChange}
+            rows={4}
+            maxLength={2000}
+            placeholder="Write a brief professional summary..."
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">{form.professional_summary.length}/2000 characters</p>
         </div>
         {error && <div role="alert" className="text-sm text-red-600">{error}</div>}
         {success && <div role="status" className="text-sm text-green-600">Personal information saved.</div>}
@@ -530,6 +629,21 @@ export default function CandidateProfilePage() {
     fetchProfile();
   }, [fetchProfile]);
 
+  async function handleVisibilityToggle(value: boolean) {
+    if (!profile) return;
+    // Optimistic update
+    setProfile({ ...profile, is_profile_public: value });
+    try {
+      await candidateApiClient.put("/candidate/profile", {
+        is_profile_public: value,
+      } as unknown as Record<string, unknown>);
+      fetchProfile();
+    } catch {
+      // Revert on failure
+      setProfile({ ...profile, is_profile_public: !value });
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -547,14 +661,29 @@ export default function CandidateProfilePage() {
     );
   }
 
+  const completeness = calculateProfileCompleteness(profile);
+
   return (
     <div>
+      {/* Header with Avatar */}
+      <div className="mb-6 flex items-center gap-4">
+        <AvatarPlaceholder name={profile.name} />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900">Edit Profile</h1>
+          <p className="mt-1 text-sm text-gray-500">Keep your profile up to date — this data is used to pre-populate new resumes.</p>
+        </div>
+      </div>
+
+      {/* Profile Completeness */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Edit Profile</h1>
-        <p className="mt-1 text-sm text-gray-500">Keep your profile up to date — this data is used to pre-populate new resumes.</p>
+        <CompletenessIndicator percentage={completeness} />
       </div>
 
       <div className="space-y-6">
+        <ProfileVisibilityToggle
+          isPublic={profile.is_profile_public}
+          onToggle={handleVisibilityToggle}
+        />
         <PersonalInfoSection profile={profile} onSaved={fetchProfile} />
         <WorkHistorySection items={profile.work_history} onSaved={fetchProfile} />
         <EducationSection items={profile.education} onSaved={fetchProfile} />

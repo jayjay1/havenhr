@@ -110,9 +110,59 @@ export interface CandidateProfile {
   location: string | null;
   linkedin_url: string | null;
   portfolio_url: string | null;
+  professional_summary: string | null;
+  github_url: string | null;
+  is_profile_public: boolean;
   work_history: WorkHistory[];
   education: Education[];
   skills: Skill[];
+}
+
+/**
+ * Pipeline stage info returned with application data.
+ */
+export interface PipelineStageInfo {
+  id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+}
+
+/**
+ * Stage transition record for application detail.
+ */
+export interface StageTransitionInfo {
+  from_stage: string;
+  to_stage: string;
+  moved_at: string;
+}
+
+/**
+ * Enriched application list item from GET /candidate/applications.
+ */
+export interface ApplicationListItem {
+  id: string;
+  job_posting_id: string;
+  resume_id: string;
+  status: "submitted" | "reviewed" | "shortlisted" | "rejected";
+  applied_at: string;
+  job_title: string;
+  company_name: string;
+  location: string | null;
+  employment_type: string | null;
+  pipeline_stage: {
+    name: string;
+    color: string;
+  } | null;
+  all_stages: PipelineStageInfo[];
+}
+
+/**
+ * Full application detail from GET /candidate/applications/{id}.
+ */
+export interface ApplicationDetail extends ApplicationListItem {
+  transitions: StageTransitionInfo[];
+  resume_snapshot: ResumeContent | null;
 }
 
 /**

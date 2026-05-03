@@ -35,6 +35,9 @@ class Candidate extends Authenticatable implements JWTSubject
         'location',
         'linkedin_url',
         'portfolio_url',
+        'professional_summary',
+        'github_url',
+        'is_profile_public',
         'is_active',
         'notification_preferences',
         'email_verified_at',
@@ -60,6 +63,7 @@ class Candidate extends Authenticatable implements JWTSubject
         return [
             'email_verified_at' => 'datetime',
             'is_active' => 'boolean',
+            'is_profile_public' => 'boolean',
             'notification_preferences' => 'array',
             'last_login_at' => 'datetime',
         ];

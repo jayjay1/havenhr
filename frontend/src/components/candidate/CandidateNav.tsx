@@ -14,9 +14,11 @@ interface CandidateNavItem {
 
 const NAV_ITEMS: CandidateNavItem[] = [
   { label: "Dashboard", href: "/candidate/dashboard" },
+  { label: "My Applications", href: "/candidate/applications" },
   { label: "Profile", href: "/candidate/profile" },
   { label: "Resumes", href: "/candidate/resumes" },
-  { label: "Applications", href: "/candidate/applications" },
+  { label: "Job Board", href: "/candidate/jobs" },
+  { label: "Settings", href: "/candidate/settings" },
 ];
 
 /**

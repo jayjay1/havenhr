@@ -1,5 +1,6 @@
 import type { ApiError, ApiResponse } from "@/types/api";
 import { ApiRequestError } from "@/lib/api";
+import type { ApplicationListItem, ApplicationDetail } from "@/types/candidate";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
@@ -130,3 +131,40 @@ export const candidateApiClient = {
     return handleResponse<T>(response);
   },
 };
+
+
+// ---------------------------------------------------------------------------
+// Application API helpers
+// ---------------------------------------------------------------------------
+
+export interface FetchApplicationsParams {
+  status?: string;
+  sort_by?: string;
+  sort_dir?: string;
+}
+
+/**
+ * Fetch the authenticated candidate's applications with optional filters.
+ */
+export async function fetchApplications(
+  params?: FetchApplicationsParams
+): Promise<ApiResponse<ApplicationListItem[]>> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.sort_by) query.set("sort_by", params.sort_by);
+  if (params?.sort_dir) query.set("sort_dir", params.sort_dir);
+  const qs = query.toString();
+  const path = `/candidate/applications${qs ? `?${qs}` : ""}`;
+  return candidateApiClient.get<ApplicationListItem[]>(path);
+}
+
+/**
+ * Fetch a single application detail by ID.
+ */
+export async function fetchApplicationDetail(
+  id: string
+): Promise<ApiResponse<ApplicationDetail>> {
+  return candidateApiClient.get<ApplicationDetail>(
+    `/candidate/applications/${id}`
+  );
+}

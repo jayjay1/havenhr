@@ -7,6 +7,7 @@ use App\Models\JobApplication;
 use App\Models\JobPosting;
 use App\Models\PipelineStage;
 use App\Models\Resume;
+use App\Models\StageTransition;
 use Illuminate\Support\Carbon;
 
 class JobApplicationService
@@ -92,26 +93,118 @@ class JobApplicationService
      * List all applications for a candidate with job and pipeline context.
      *
      * @param  string  $candidateId
+     * @param  string|null  $status
+     * @param  string  $sortBy
+     * @param  string  $sortDir
      * @return array<int, array<string, mixed>>
      */
-    public function listCandidateApplications(string $candidateId): array
+    public function listCandidateApplications(
+        string $candidateId,
+        ?string $status = null,
+        string $sortBy = 'applied_at',
+        string $sortDir = 'desc',
+    ): array {
+        $query = JobApplication::where('candidate_id', $candidateId)
+            ->with(['jobPosting' => function ($q) {
+                $q->withoutGlobalScopes()->with(['company', 'pipelineStages' => function ($sq) {
+                    $sq->orderBy('sort_order');
+                }]);
+            }, 'pipelineStage']);
+
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+
+        if ($sortBy === 'job_title') {
+            $query->join('job_postings', 'job_applications.job_posting_id', '=', 'job_postings.id')
+                ->orderBy('job_postings.title', $sortDir)
+                ->select('job_applications.*');
+        } else {
+            $query->orderBy('applied_at', $sortDir);
+        }
+
+        $applications = $query->get();
+
+        return $applications->map(function (JobApplication $app) {
+            $allStages = $app->jobPosting?->pipelineStages?->map(fn (PipelineStage $stage) => [
+                'name' => $stage->name,
+                'color' => $stage->color,
+                'sort_order' => $stage->sort_order,
+            ])->values()->toArray() ?? [];
+
+            return [
+                'id' => $app->id,
+                'job_posting_id' => $app->job_posting_id,
+                'resume_id' => $app->resume_id,
+                'status' => $app->status,
+                'applied_at' => $app->applied_at->toIso8601String(),
+                'job_title' => $app->jobPosting?->title,
+                'company_name' => $app->jobPosting?->company?->name,
+                'location' => $app->jobPosting?->location,
+                'employment_type' => $app->jobPosting?->employment_type,
+                'pipeline_stage' => $app->pipelineStage ? [
+                    'name' => $app->pipelineStage->name,
+                    'color' => $app->pipelineStage->color,
+                ] : null,
+                'all_stages' => $allStages,
+            ];
+        })->values()->toArray();
+    }
+
+    /**
+     * Get full detail for a single candidate application.
+     *
+     * @param  string  $candidateId
+     * @param  string  $applicationId
+     * @return array<string, mixed>|null
+     */
+    public function getCandidateApplicationDetail(string $candidateId, string $applicationId): ?array
     {
-        $applications = JobApplication::where('candidate_id', $candidateId)
-            ->with(['jobPosting' => function ($query) {
-                $query->withoutGlobalScopes()->with('company');
-            }, 'pipelineStage'])
-            ->orderByDesc('applied_at')
+        $application = JobApplication::with(['jobPosting' => function ($q) {
+            $q->withoutGlobalScopes()->with(['company', 'pipelineStages' => function ($sq) {
+                $sq->orderBy('sort_order');
+            }]);
+        }, 'pipelineStage'])
+            ->find($applicationId);
+
+        if (! $application || $application->candidate_id !== $candidateId) {
+            return null;
+        }
+
+        $transitions = StageTransition::where('job_application_id', $applicationId)
+            ->with(['fromStage', 'toStage'])
+            ->orderBy('moved_at')
             ->get();
 
-        return $applications->map(fn (JobApplication $app) => [
-            'id' => $app->id,
-            'job_posting_id' => $app->job_posting_id,
-            'resume_id' => $app->resume_id,
-            'status' => $app->status,
-            'applied_at' => $app->applied_at->toIso8601String(),
-            'job_title' => $app->jobPosting?->title,
-            'company_name' => $app->jobPosting?->company?->name,
-            'pipeline_stage' => $app->pipelineStage?->name,
+        $allStages = $application->jobPosting?->pipelineStages?->map(fn (PipelineStage $stage) => [
+            'name' => $stage->name,
+            'color' => $stage->color,
+            'sort_order' => $stage->sort_order,
+        ])->values()->toArray() ?? [];
+
+        $transitionsArray = $transitions->map(fn (StageTransition $t) => [
+            'from_stage' => $t->fromStage?->name,
+            'to_stage' => $t->toStage?->name,
+            'moved_at' => $t->moved_at->toIso8601String(),
         ])->values()->toArray();
+
+        return [
+            'id' => $application->id,
+            'job_posting_id' => $application->job_posting_id,
+            'resume_id' => $application->resume_id,
+            'status' => $application->status,
+            'applied_at' => $application->applied_at->toIso8601String(),
+            'job_title' => $application->jobPosting?->title,
+            'company_name' => $application->jobPosting?->company?->name,
+            'location' => $application->jobPosting?->location,
+            'employment_type' => $application->jobPosting?->employment_type,
+            'pipeline_stage' => $application->pipelineStage ? [
+                'name' => $application->pipelineStage->name,
+                'color' => $application->pipelineStage->color,
+            ] : null,
+            'all_stages' => $allStages,
+            'transitions' => $transitionsArray,
+            'resume_snapshot' => $application->resume_snapshot,
+        ];
     }
 }

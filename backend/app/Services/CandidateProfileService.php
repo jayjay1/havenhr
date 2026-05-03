@@ -43,6 +43,9 @@ class CandidateProfileService
             'location' => $candidate->location,
             'linkedin_url' => $candidate->linkedin_url,
             'portfolio_url' => $candidate->portfolio_url,
+            'professional_summary' => $candidate->professional_summary,
+            'github_url' => $candidate->github_url,
+            'is_profile_public' => $candidate->is_profile_public,
             'work_history' => $workHistory->map(fn (CandidateWorkHistory $entry) => [
                 'id' => $entry->id,
                 'job_title' => $entry->job_title,
@@ -81,7 +84,7 @@ class CandidateProfileService
     {
         $candidate = Candidate::findOrFail($candidateId);
 
-        $allowedFields = ['name', 'phone', 'location', 'linkedin_url', 'portfolio_url'];
+        $allowedFields = ['name', 'phone', 'location', 'linkedin_url', 'portfolio_url', 'professional_summary', 'github_url', 'is_profile_public'];
         $updateData = array_intersect_key($data, array_flip($allowedFields));
 
         $candidate->update($updateData);
@@ -95,6 +98,9 @@ class CandidateProfileService
             'location' => $candidate->location,
             'linkedin_url' => $candidate->linkedin_url,
             'portfolio_url' => $candidate->portfolio_url,
+            'professional_summary' => $candidate->professional_summary,
+            'github_url' => $candidate->github_url,
+            'is_profile_public' => $candidate->is_profile_public,
         ];
     }
 

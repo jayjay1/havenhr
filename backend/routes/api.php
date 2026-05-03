@@ -163,6 +163,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('candidate/applications')->middleware('candidate.auth')->group(function () {
         Route::post('/', [CandidateApplicationController::class, 'apply']);
         Route::get('/', [CandidateApplicationController::class, 'index']);
+        Route::get('/{id}', [CandidateApplicationController::class, 'show']);
     });
 
     // Public resume endpoint (no auth required)

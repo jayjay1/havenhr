@@ -68,12 +68,55 @@ class CandidateApplicationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'status' => ['sometimes', 'nullable', 'string', 'in:submitted,reviewed,shortlisted,rejected'],
+            'sort_by' => ['sometimes', 'nullable', 'string', 'in:applied_at,job_title'],
+            'sort_dir' => ['sometimes', 'nullable', 'string', 'in:asc,desc'],
+        ]);
+
         $candidate = $request->user();
 
-        $applications = $this->applicationService->listCandidateApplications($candidate->id);
+        $status = $request->query('status');
+        $sortBy = $request->query('sort_by', 'applied_at');
+        $sortDir = $request->query('sort_dir', 'desc');
+
+        $applications = $this->applicationService->listCandidateApplications(
+            $candidate->id,
+            $status,
+            $sortBy,
+            $sortDir,
+        );
 
         return response()->json([
             'data' => $applications,
+        ]);
+    }
+
+    /**
+     * Get a single application detail for the authenticated candidate.
+     *
+     * GET /api/v1/candidate/applications/{id}
+     */
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $candidate = $request->user();
+
+        $detail = $this->applicationService->getCandidateApplicationDetail(
+            $candidate->id,
+            $id,
+        );
+
+        if ($detail === null) {
+            return response()->json([
+                'error' => [
+                    'code' => 'NOT_FOUND',
+                    'message' => 'Application not found.',
+                ],
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => $detail,
         ]);
     }
 }
