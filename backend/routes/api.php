@@ -14,6 +14,7 @@ use App\Http\Controllers\JobPostingController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\PublicJobController;
 use App\Http\Controllers\PublicResumeController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ResumeController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TenantController;
@@ -93,6 +94,15 @@ Route::prefix('v1')->group(function () {
         // Company settings
         Route::get('/company', [CompanyController::class, 'show']);
         Route::put('/company', [CompanyController::class, 'update'])->middleware('rbac:tenant.update');
+
+        // Reports & Analytics
+        Route::prefix('reports')->middleware('rbac:reports.view')->group(function () {
+            Route::get('/overview', [ReportsController::class, 'overview']);
+            Route::get('/time-to-hire', [ReportsController::class, 'timeToHire']);
+            Route::get('/funnel', [ReportsController::class, 'funnel']);
+            Route::get('/sources', [ReportsController::class, 'sources']);
+            Route::get('/export/{type}', [ReportsController::class, 'export']);
+        });
     });
 
     // Candidate auth endpoints
