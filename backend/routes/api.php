@@ -8,6 +8,7 @@ use App\Http\Controllers\CandidateAuthController;
 use App\Http\Controllers\CandidateProfileController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\EmployerApplicationController;
 use App\Http\Controllers\JobPostingController;
@@ -75,6 +76,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('/jobs/{id}', [JobPostingController::class, 'destroy'])->middleware('rbac:jobs.delete');
         Route::patch('/jobs/{id}/status', [JobPostingController::class, 'transitionStatus'])->middleware('rbac:jobs.update');
 
+        // Interview CRUD (tenant-scoped)
+        Route::post('/interviews', [InterviewController::class, 'store'])->middleware('rbac:applications.manage');
+        Route::get('/interviews/{id}', [InterviewController::class, 'show'])->middleware('rbac:applications.view');
+        Route::put('/interviews/{id}', [InterviewController::class, 'update'])->middleware('rbac:applications.manage');
+        Route::patch('/interviews/{id}/cancel', [InterviewController::class, 'cancel'])->middleware('rbac:applications.manage');
+
         // Bulk pipeline operations (tenant-scoped) — must be before /applications/{appId} routes
         Route::post('/applications/bulk-move', [PipelineController::class, 'bulkMove'])->middleware('rbac:applications.manage');
         Route::post('/applications/bulk-reject', [PipelineController::class, 'bulkReject'])->middleware('rbac:applications.manage');
@@ -82,6 +89,7 @@ Route::prefix('v1')->group(function () {
         // Application stage transitions (tenant-scoped)
         Route::post('/applications/{appId}/move', [PipelineController::class, 'moveApplication'])->middleware('rbac:applications.manage');
         Route::get('/applications/{appId}/transitions', [PipelineController::class, 'transitionHistory'])->middleware('rbac:applications.view');
+        Route::get('/applications/{appId}/interviews', [InterviewController::class, 'listForApplication'])->middleware('rbac:applications.view');
 
         // Employer application detail and talent pool (tenant-scoped)
         Route::get('/applications/{id}', [EmployerApplicationController::class, 'show'])->middleware('rbac:applications.view');
@@ -90,6 +98,7 @@ Route::prefix('v1')->group(function () {
         // Dashboard metrics
         Route::get('/dashboard/metrics', [DashboardController::class, 'metrics']);
         Route::get('/dashboard/applications-by-stage', [DashboardController::class, 'applicationsByStage']);
+        Route::get('/dashboard/upcoming-interviews', [InterviewController::class, 'upcoming']);
 
         // Company settings
         Route::get('/company', [CompanyController::class, 'show']);
@@ -175,6 +184,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [CandidateApplicationController::class, 'index']);
         Route::get('/{id}', [CandidateApplicationController::class, 'show']);
     });
+
+    // Candidate interview endpoints (protected)
+    Route::get('/candidate/interviews', [InterviewController::class, 'candidateInterviews'])->middleware('candidate.auth');
 
     // Public resume endpoint (no auth required)
     Route::get('/public/resumes/{token}', [PublicResumeController::class, 'show']);

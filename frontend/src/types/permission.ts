@@ -23,6 +23,8 @@ export type PermissionName =
   | "candidates.list"
   | "candidates.update"
   | "candidates.delete"
+  | "applications.view"
+  | "applications.manage"
   | "pipeline.manage"
   | "reports.view"
   | "owner.assign";

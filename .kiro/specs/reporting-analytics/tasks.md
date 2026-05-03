@@ -6,7 +6,7 @@ This plan implements the Reporting & Analytics feature in incremental steps: bac
 
 ## Tasks
 
-- [-] 1. Create ReportsController with overview endpoint and route registration
+- [x] 1. Create ReportsController with overview endpoint and route registration
   - [ ] 1.1 Create `backend/app/Http/Controllers/ReportsController.php` with `overview()` method
     - Parse `start_date` and `end_date` query parameters with defaults (last 30 days)
     - Validate date format (`Y-m-d`) and that `start_date <= end_date`, return 422 on failure

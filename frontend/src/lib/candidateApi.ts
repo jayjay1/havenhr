@@ -168,3 +168,18 @@ export async function fetchApplicationDetail(
     `/candidate/applications/${id}`
   );
 }
+
+// ---------------------------------------------------------------------------
+// Interview API helpers
+// ---------------------------------------------------------------------------
+
+import type { CandidateInterview } from "@/types/interview";
+
+/**
+ * Fetch the authenticated candidate's interviews.
+ */
+export async function fetchCandidateInterviews(): Promise<
+  ApiResponse<CandidateInterview[]>
+> {
+  return candidateApiClient.get<CandidateInterview[]>("/candidate/interviews");
+}

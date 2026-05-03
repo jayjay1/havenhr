@@ -6,6 +6,7 @@ import { apiClient, ApiRequestError } from "@/lib/api";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { StageChart } from "@/components/dashboard/StageChart";
+import { UpcomingInterviewsWidget } from "@/components/dashboard/UpcomingInterviewsWidget";
 
 /** Dashboard metrics response shape */
 interface DashboardMetrics {
@@ -279,6 +280,9 @@ export default function DashboardPage() {
           ) : (
             <StageChart data={stageData} loading={stageLoading} />
           )}
+
+          {/* Upcoming Interviews */}
+          <UpcomingInterviewsWidget />
         </div>
       </div>
     </div>

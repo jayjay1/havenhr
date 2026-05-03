@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchApplications } from "@/lib/candidateApi";
 import { ApiRequestError } from "@/lib/api";
 import type { ApplicationListItem } from "@/types/candidate";
+import { CandidateInterviewsList } from "@/components/candidate/CandidateInterviewsList";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -162,6 +163,11 @@ export default function ApplicationsDashboardPage() {
         <p className="mt-1 text-sm text-gray-500">
           Track the status of your job applications.
         </p>
+      </div>
+
+      {/* Upcoming Interviews */}
+      <div className="mb-6">
+        <CandidateInterviewsList />
       </div>
 
       {/* Filter & Sort Bar */}

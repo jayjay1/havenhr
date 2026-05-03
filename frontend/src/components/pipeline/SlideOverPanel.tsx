@@ -8,6 +8,9 @@ import {
   type KanbanApplication,
   type KanbanStage,
 } from "./KanbanProvider";
+import { useAuth } from "@/contexts/AuthContext";
+import { ScheduleInterviewModal } from "@/components/interviews/ScheduleInterviewModal";
+import { InterviewList } from "@/components/interviews/InterviewList";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -89,9 +92,14 @@ export function SlideOverPanel({
   onMoveApplication,
 }: SlideOverPanelProps) {
   const { state } = useKanban();
+  const { hasPermission } = useAuth();
   const [transitions, setTransitions] = useState<StageTransition[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [moveTarget, setMoveTarget] = useState("");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [interviewListKey, setInterviewListKey] = useState(0);
+
+  const canManageApplications = hasPermission("applications.manage");
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -453,9 +461,44 @@ export function SlideOverPanel({
                 </div>
               </div>
             </section>
+
+            {/* Interviews section */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-900">
+                  Interviews
+                </h3>
+                {canManageApplications && (
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Schedule Interview
+                  </button>
+                )}
+              </div>
+              <InterviewList
+                key={interviewListKey}
+                applicationId={applicationId}
+                canManage={canManageApplications}
+              />
+            </section>
           </div>
         )}
       </div>
+
+      {/* Schedule Interview Modal */}
+      {showScheduleModal && (
+        <ScheduleInterviewModal
+          applicationId={applicationId}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => setInterviewListKey((k) => k + 1)}
+        />
+      )}
     </>
   );
 }
