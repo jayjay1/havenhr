@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Events\ApplicationStageChanged;
+use App\Events\CandidateApplied;
 use App\Events\JobPostingCreated;
 use App\Events\JobPostingDeleted;
 use App\Events\JobPostingStatusChanged;
@@ -15,7 +16,10 @@ use App\Events\UserLoginFailed;
 use App\Events\UserLogout;
 use App\Events\UserPasswordReset;
 use App\Events\UserRegistered;
+use App\Listeners\ApplicationConfirmationNotificationListener;
 use App\Listeners\AuditLogListener;
+use App\Listeners\StageChangeNotificationListener;
+use App\Listeners\UserInviteNotificationListener;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -31,6 +35,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         UserRegistered::class => [
             AuditLogListener::class,
+            UserInviteNotificationListener::class,
         ],
         UserLogin::class => [
             AuditLogListener::class,
@@ -64,6 +69,11 @@ class EventServiceProvider extends ServiceProvider
         ],
         ApplicationStageChanged::class => [
             AuditLogListener::class,
+            StageChangeNotificationListener::class,
+        ],
+        CandidateApplied::class => [
+            AuditLogListener::class,
+            ApplicationConfirmationNotificationListener::class,
         ],
     ];
 

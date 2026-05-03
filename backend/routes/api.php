@@ -8,6 +8,7 @@ use App\Http\Controllers\CandidateAuthController;
 use App\Http\Controllers\CandidateProfileController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\EmployerApplicationController;
 use App\Http\Controllers\JobPostingController;
 use App\Http\Controllers\PipelineController;
@@ -128,6 +129,10 @@ Route::prefix('v1')->group(function () {
 
         // Skills
         Route::put('/skills', [CandidateProfileController::class, 'replaceSkills']);
+
+        // Notification preferences
+        Route::get('/notification-preferences', [NotificationPreferenceController::class, 'show']);
+        Route::put('/notification-preferences', [NotificationPreferenceController::class, 'update']);
     });
 
     // Candidate resume endpoints (all protected)

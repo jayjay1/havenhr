@@ -57,6 +57,7 @@ class UserService
             [
                 'name' => $data['name'],
                 'email' => $data['email'],
+                'password' => $data['password'],
                 'role' => $data['role'],
                 'created_by' => $createdById,
             ],

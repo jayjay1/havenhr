@@ -9,6 +9,7 @@ use App\Events\UserPasswordReset;
 use App\Models\PasswordReset;
 use App\Models\RefreshToken;
 use App\Models\User;
+use App\Notifications\PasswordResetNotification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -311,12 +312,12 @@ class AuthService
             'is_used' => false,
         ]);
 
-        // Log the reset link (email not configured, so just log it)
-        Log::info('Password reset link generated', [
-            'user_id' => $user->id,
-            'token' => $rawToken,
-            'reset_url' => config('app.frontend_url', 'http://localhost:3000') . '/reset-password/' . $rawToken,
-        ]);
+        // Send password reset notification email
+        $resetUrl = config('app.frontend_url', 'http://localhost:3001') . '/reset-password/' . $rawToken;
+        $user->notify(new PasswordResetNotification(
+            resetUrl: $resetUrl,
+            userName: $user->name,
+        ));
     }
 
     /**
