@@ -9,7 +9,9 @@ use App\Http\Controllers\CandidateProfileController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InterviewController;
+use App\Http\Controllers\InterviewKitController;
 use App\Http\Controllers\NotificationPreferenceController;
+use App\Http\Controllers\ScorecardController;
 use App\Http\Controllers\EmployerApplicationController;
 use App\Http\Controllers\JobPostingController;
 use App\Http\Controllers\PipelineController;
@@ -81,6 +83,23 @@ Route::prefix('v1')->group(function () {
         Route::get('/interviews/{id}', [InterviewController::class, 'show'])->middleware('rbac:applications.view');
         Route::put('/interviews/{id}', [InterviewController::class, 'update'])->middleware('rbac:applications.manage');
         Route::patch('/interviews/{id}/cancel', [InterviewController::class, 'cancel'])->middleware('rbac:applications.manage');
+
+        // Interview Kit management (tenant-scoped)
+        Route::get('/jobs/{jobId}/interview-kits', [InterviewKitController::class, 'listForJob'])->middleware('rbac:jobs.view');
+        Route::post('/jobs/{jobId}/stages/{stageId}/interview-kits', [InterviewKitController::class, 'store'])->middleware('rbac:pipeline.manage');
+        Route::post('/jobs/{jobId}/stages/{stageId}/interview-kits/from-template', [InterviewKitController::class, 'createFromTemplate'])->middleware('rbac:pipeline.manage');
+        Route::get('/interview-kits/{id}', [InterviewKitController::class, 'show'])->middleware('rbac:jobs.view');
+        Route::put('/interview-kits/{id}', [InterviewKitController::class, 'update'])->middleware('rbac:pipeline.manage');
+        Route::delete('/interview-kits/{id}', [InterviewKitController::class, 'destroy'])->middleware('rbac:pipeline.manage');
+        Route::get('/interview-kit-templates', [InterviewKitController::class, 'templates'])->middleware('rbac:jobs.view');
+
+        // Scorecard endpoints (tenant-scoped)
+        Route::get('/interviews/{interviewId}/scorecard-form', [ScorecardController::class, 'form'])->middleware('rbac:applications.view');
+        Route::post('/interviews/{interviewId}/scorecard', [ScorecardController::class, 'store'])->middleware('rbac:applications.manage');
+        Route::get('/interviews/{interviewId}/scorecards', [ScorecardController::class, 'listForInterview'])->middleware('rbac:applications.view');
+        Route::get('/scorecards/{id}', [ScorecardController::class, 'show'])->middleware('rbac:applications.view');
+        Route::put('/scorecards/{id}', [ScorecardController::class, 'update'])->middleware('rbac:applications.manage');
+        Route::get('/applications/{appId}/scorecard-summary', [ScorecardController::class, 'summary'])->middleware('rbac:applications.view');
 
         // Bulk pipeline operations (tenant-scoped) — must be before /applications/{appId} routes
         Route::post('/applications/bulk-move', [PipelineController::class, 'bulkMove'])->middleware('rbac:applications.manage');

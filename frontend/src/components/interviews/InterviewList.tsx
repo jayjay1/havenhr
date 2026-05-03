@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { listInterviewsForApplication, updateInterview, cancelInterview } from "@/lib/interviewApi";
+import { listScorecardsForInterview } from "@/lib/scorecardApi";
 import { ApiRequestError } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { ScorecardSubmissionModal } from "./ScorecardSubmissionModal";
 import type { InterviewListItem, InterviewStatus } from "@/types/interview";
 
 interface InterviewListProps {
@@ -38,10 +41,13 @@ function formatType(type: string): string {
 }
 
 export function InterviewList({ applicationId, canManage }: InterviewListProps) {
+  const { user } = useAuth();
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [scorecardModalInterviewId, setScorecardModalInterviewId] = useState<string | null>(null);
+  const [interviewsWithMyScorecard, setInterviewsWithMyScorecard] = useState<Set<string>>(new Set());
 
   const loadInterviews = useCallback(async () => {
     setLoading(true);
@@ -49,6 +55,26 @@ export function InterviewList({ applicationId, canManage }: InterviewListProps) 
     try {
       const response = await listInterviewsForApplication(applicationId);
       setInterviews(response.data);
+
+      // Check which completed interviews already have a scorecard from the current user
+      const completedInterviews = response.data.filter((i) => i.status === "completed");
+      const scorecardChecks = await Promise.allSettled(
+        completedInterviews.map((i) => listScorecardsForInterview(i.id))
+      );
+
+      const withScorecard = new Set<string>();
+      completedInterviews.forEach((interview, idx) => {
+        const result = scorecardChecks[idx];
+        if (result.status === "fulfilled") {
+          const hasMyScorecard = result.value.data.some(
+            (sc) => sc.submitted_by === user?.id
+          );
+          if (hasMyScorecard) {
+            withScorecard.add(interview.id);
+          }
+        }
+      });
+      setInterviewsWithMyScorecard(withScorecard);
     } catch (err) {
       setError(
         err instanceof ApiRequestError ? err.message : "Failed to load interviews."
@@ -56,7 +82,7 @@ export function InterviewList({ applicationId, canManage }: InterviewListProps) 
     } finally {
       setLoading(false);
     }
-  }, [applicationId]);
+  }, [applicationId, user?.id]);
 
   useEffect(() => {
     loadInterviews();
@@ -187,8 +213,39 @@ export function InterviewList({ applicationId, canManage }: InterviewListProps) 
               </button>
             </div>
           )}
+
+          {/* Scorecard actions for completed interviews */}
+          {interview.status === "completed" && (
+            <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+              {interviewsWithMyScorecard.has(interview.id) ? (
+                <span className="text-xs text-green-600 font-medium">
+                  ✓ Scorecard submitted
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setScorecardModalInterviewId(interview.id)}
+                  className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Submit Scorecard
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
+
+      {/* Scorecard Submission Modal */}
+      {scorecardModalInterviewId && (
+        <ScorecardSubmissionModal
+          interviewId={scorecardModalInterviewId}
+          onClose={() => setScorecardModalInterviewId(null)}
+          onSubmitted={() => {
+            setScorecardModalInterviewId(null);
+            loadInterviews();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { ScheduleInterviewModal } from "@/components/interviews/ScheduleInterviewModal";
 import { InterviewList } from "@/components/interviews/InterviewList";
+import { ScorecardSummarySection } from "@/components/pipeline/ScorecardSummarySection";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -486,6 +487,14 @@ export function SlideOverPanel({
                 applicationId={applicationId}
                 canManage={canManageApplications}
               />
+            </section>
+
+            {/* Scorecard Summary section */}
+            <section>
+              <h3 className="text-sm font-medium text-gray-900 mb-3">
+                Scorecard Summary
+              </h3>
+              <ScorecardSummarySection applicationId={applicationId} />
             </section>
           </div>
         )}

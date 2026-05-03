@@ -15,6 +15,7 @@ import {
   type KanbanStage,
 } from "@/components/pipeline/KanbanProvider";
 import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
+import { InterviewKitManager } from "@/components/interviews/InterviewKitManager";
 import type { JobPosting, JobStatus } from "@/types/job";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -266,6 +267,17 @@ export default function EmployerJobDetailPage() {
           <KanbanBoardWrapper jobId={id} />
         </KanbanProvider>
       </div>
+
+      {/* Interview Kits section */}
+      {job.pipeline_stages && job.pipeline_stages.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Interview Kits</h2>
+          <InterviewKitManager
+            jobId={id}
+            stages={job.pipeline_stages.map((s) => ({ id: s.id, name: s.name }))}
+          />
+        </div>
+      )}
 
       {/* Job description section */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
